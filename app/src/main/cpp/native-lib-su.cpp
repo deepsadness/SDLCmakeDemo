@@ -9,6 +9,41 @@ extern "C" {
 #include "libswscale/swscale.h"
 }
 
+//参考，加上了SDL event的版本
+
+//自己定义两个事件
+//刷新的Event
+#define SFM_REFRESH_EVENT (SDL_USEREVENT+1)
+//退出的Event
+#define SFM_BREAK_EVENT (SDL_USEREVENT+2)
+
+int thread_exit = 0;
+int thread_pause = 0;
+
+//创建了一个线程，不断给自己发送刷新的事件
+int sfp_refresh_thread(void *opaque) {
+    thread_exit = 0;
+    thread_pause = 0;
+
+    while (!thread_exit) {
+        if (!thread_pause) {
+            SDL_Event event;
+            event.type = SFM_REFRESH_EVENT;
+            SDL_PushEvent(&event);
+        }
+        //为什么同样不能使用延迟呢？
+//        SDL_Delay(40);
+    }
+    thread_exit = 0;
+    thread_pause = 0;
+    //Break
+    SDL_Event event;
+    event.type = SFM_BREAK_EVENT;
+    SDL_PushEvent(&event);
+
+    return 0;
+}
+
 extern "C"
 int avError(int error) {
     char buf[1000000];
@@ -162,7 +197,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     //创建Renderer -1 表示使用默认的窗口 后面一个是Renderer的方式，0的话，应该就是未指定把？？？
-    renderer = SDL_CreateRenderer(window, -1, 0);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC);
 
     //这里的YU12 对应YUV420P ,SDL_TEXTUREACCESS_STREAMING 是表示texture 是不断被刷新的。
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_YV12,
@@ -190,66 +225,59 @@ int main(int argc, char *argv[]) {
                                              pCodecCtx->height, AV_PIX_FMT_YUV420P, SWS_BICUBIC,
                                              NULL, NULL, NULL);
 
-    while (av_read_frame(pFormatCtx, packet) >= 0) {
-        if (packet->stream_index == video_stream) {
-            //送入解码器
-            int gop = avcodec_send_packet(pCodecCtx, packet);
-            //如果成功获取一帧的数据
-            if (gop == 0) {
-                //使用pFrame接受数据
-                ret = avcodec_receive_frame(pCodecCtx, pFrameYUV);
-                if (ret == 0) {
-                    //进行缩放。这里可以用libyuv进行转换
-                    sws_scale(img_convert, reinterpret_cast<const uint8_t *const *>(pFrameYUV
-                                      ->data), pFrameYUV->linesize, 0,
-                              pCodecCtx->height,
-                              pFrameYUV->data, pFrameYUV->linesize);
-                    //应为是YUV，所以调用UpdateYUV方法，分别将YUV填充进去
-                    SDL_UpdateYUVTexture(texture, &sdlRect,
-                                         pFrameYUV
-                                                 ->data[0], pFrameYUV->linesize[0],
-                                         pFrameYUV->data[1], pFrameYUV->linesize[1],
-                                         pFrameYUV->data[2], pFrameYUV->linesize[2]);
+    //创造线程，开始等待
+    video_tid = SDL_CreateThread(sfp_refresh_thread, NULL, NULL);
 
-                    //清空数据
-                    SDL_RenderClear(renderer);
-                    //复制数据
-                    SDL_RenderCopy(renderer, texture, &sdlRect, &sdlRect
-                    );
-                    //渲染到屏幕
-                    SDL_RenderPresent(renderer);
-                    //延迟40 25 fps??? Android端使用的话，就会卡顿
-//                    SDL_Delay(40);
-                } else if (ret == AVERROR(EAGAIN)) {
-                    ALOGE("%s", "Frame is not available right, please try another input");
-                } else if (ret == AVERROR_EOF) {
-                    ALOGE("%s", "the decoder has been fully flushed");
-                } else if (ret == AVERROR(EINVAL)) {
-                    ALOGE("%s", "codec not opened, or it is an encoder");
-                } else {
-                    ALOGI("%s", "legitimate decoding errors");
+    //创建一个死循环
+    for (;;) {
+        //开始等待回调
+        SDL_WaitEvent(&event);
+        if (event.type == SFM_REFRESH_EVENT) {  //如果是我们自己刷新事件的话，就开始刷新
+            if (av_read_frame(pFormatCtx, packet) >= 0) {
+                if (packet->stream_index == video_stream) {
+                    int gop = avcodec_send_packet(pCodecCtx, packet);
+                    if (gop == 0) {
+                        ret = avcodec_receive_frame(pCodecCtx, pFrameYUV);
+                        if (ret == 0) {
+                            //进行缩放。这里可以用libyuv进行转换
+                            sws_scale(img_convert,
+                                      reinterpret_cast<const uint8_t *const *>(pFrameYUV
+                                              ->data), pFrameYUV->linesize, 0,
+                                      pCodecCtx->height,
+                                      pFrameYUV->data, pFrameYUV->linesize);
+                            //应为是YUV，所以调用UpdateYUV方法，分别将YUV填充进去
+                            SDL_UpdateYUVTexture(texture, &sdlRect,
+                                                 pFrameYUV
+                                                         ->data[0], pFrameYUV->linesize[0],
+                                                 pFrameYUV->data[1], pFrameYUV->linesize[1],
+                                                 pFrameYUV->data[2], pFrameYUV->linesize[2]);
+
+                            //清空数据
+                            SDL_RenderClear(renderer);
+                            //复制数据
+                            SDL_RenderCopy(renderer, texture, &sdlRect, &sdlRect);
+                            //渲染到屏幕
+                            SDL_RenderPresent(renderer);
+                        } else if (ret == AVERROR(EAGAIN)) {
+                            ALOGE("%s", "Frame is not available right, please try another input");
+                        } else if (ret == AVERROR_EOF) {
+                            ALOGE("%s", "the decoder has been fully flushed");
+                        } else if (ret == AVERROR(EINVAL)) {
+                            ALOGE("%s", "codec not opened, or it is an encoder");
+                        } else {
+                            ALOGI("%s", "legitimate decoding errors");
+                        }
+                    }
+                    av_packet_unref(packet);
                 }
             }
-        }
-
-        //读完，再次释放这个pack,重新去读
-        av_packet_unref(packet);
-
-        //每一帧，去相应一次对应的SDL事件
-        if (SDL_PollEvent(&event)) {
-            SDL_bool needToQuit = SDL_FALSE;
-            switch (event.type) {
-                case SDL_QUIT:
-                case SDL_KEYDOWN:
-                    needToQuit = SDL_TRUE;
-                    break;
-                default:
-                    break;
-            }
-
-            if (needToQuit) {
-                break;
-            }
+        } else if (event.type == SDL_QUIT) {
+            thread_exit = 1;
+        } else if (event.type == SFM_BREAK_EVENT) {
+            break;
+        } else {
+            //其他事件，就简单的当做是暂停
+            thread_pause = !thread_pause;
         }
     }
 
