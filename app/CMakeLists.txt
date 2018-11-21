@@ -29,7 +29,7 @@ set_target_properties(ffmpeg PROPERTIES IMPORTED_LOCATION ${LINK_DIR}/libffmpeg.
 #LOCAL_SHARED_LIBRARIES := SDL2
 #
 #LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -llog
-
+file(GLOB MAIN_SOURCE src/main/cpp/*)
 
 add_library(
         #他原来的名字，就是叫main  保持一致
@@ -37,7 +37,14 @@ add_library(
         # Sets the library as a shared library.
         SHARED
         # Provides a relative path to your source file(s).
-        src/main/cpp/native-lib-su.cpp)
+#        ${MAIN_SOURCE}
+#        src/main/cpp/native-lib-su.cpp
+        src/main/cpp/native-lib-audio.cpp
+#        src/main/cpp/video_player.cpp
+#        src/main/cpp/ffplay/ffplay.c
+#        src/main/cpp/ffplay/cmdutils.c
+#        src/main/cpp/ffplay/cmdutils_opencl.c
+)
 
 
 find_library( # Sets the name of the path variable.

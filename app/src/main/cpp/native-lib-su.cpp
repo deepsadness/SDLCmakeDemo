@@ -71,7 +71,7 @@ void syslog_print(void *ptr, int level, const char *fmt, va_list vl) {
 
 extern "C"
 //这里是直接定义了SDL的main方法吗
-int main(int argc, char *argv[]) {
+int main77(int argc, char *argv[]) {
 
     // 打印ffmpeg信息
     const char *str = avcodec_configuration();

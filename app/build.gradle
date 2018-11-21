@@ -10,7 +10,7 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                cppFlags "-fexceptions"
+                cppFlags "-fexceptions -Wdeprecated-declarations"
             }
         }
 

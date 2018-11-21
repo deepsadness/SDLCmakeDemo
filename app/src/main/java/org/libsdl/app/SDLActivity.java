@@ -169,7 +169,8 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
      * @return arguments for the native application.
      */
     protected String[] getArguments() {
-        String videoPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "SAO-6.mp4").getAbsolutePath();
+//        String videoPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "SAO-6.mp4").getAbsolutePath();
+        String videoPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "qingcun.mp3").getAbsolutePath();
         return new String[]{videoPath};
     }
 
