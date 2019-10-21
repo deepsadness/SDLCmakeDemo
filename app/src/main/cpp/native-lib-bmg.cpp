@@ -5,7 +5,7 @@
 //把显示图片的原来的main方法给注释掉了
 extern "C"
 //这里是直接定义了SDL的main方法吗
-int main00(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
 
     //开始准备sdl的部分
     //SDL 要素  window render texture

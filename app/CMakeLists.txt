@@ -38,8 +38,9 @@ add_library(
         SHARED
         # Provides a relative path to your source file(s).
 #        ${MAIN_SOURCE}
+        src/main/cpp/native-lib-bmg.cpp
 #        src/main/cpp/native-lib-su.cpp
-        src/main/cpp/native-lib-audio.cpp
+#        src/main/cpp/native-lib-audio.cpp
 #        src/main/cpp/video_player.cpp
 #        src/main/cpp/ffplay/ffplay.c
 #        src/main/cpp/ffplay/cmdutils.c
